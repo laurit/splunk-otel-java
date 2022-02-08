@@ -59,6 +59,7 @@ include(
     "instrumentation:wildfly",
     "matrix",
     "profiler",
+    "profiler:pprof",
     "smoke-tests",
     "testing:agent-for-testing",
     "testing:agent-test-extension",
