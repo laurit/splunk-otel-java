@@ -2044,9 +2044,14 @@ public class MetadataGenerator {
               defaultSeen = true;
             } else if (!defaultSeen && metrics != null && !metrics.isEmpty()) {
               // skip when default configuration was not present
-              // currently we skip spring-webflux-5.0 there the metrics are actually only for the
-              // library instrumentation and not the agent
-              continue;
+              // spring-webflux-5.0 doesn't have default configuration, use the controller telemetry
+              // configuration
+              if ("otel.instrumentation.common.experimental.controller-telemetry.enabled"
+                  .equals(configuration)) {
+                isDefault = true;
+              } else {
+                continue;
+              }
             } else if (!configuration.contains("=")) {
               // only include configurations that look like setting names, this excludes Java17
               // configuration for runtime-telemetry
