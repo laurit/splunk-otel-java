@@ -2029,19 +2029,55 @@ public class MetadataGenerator {
 
         List<Map<String, Object>> telemetry = (List<Map<String, Object>>) info.get("telemetry");
         if (telemetry != null) {
+          // sort default configuration first
+          telemetry.sort(Comparator.comparingInt(c -> "default".equals(c.get("when")) ? -1 : 0));
+
+          boolean defaultSeen = false;
+          Set<String> seenMetrics = new HashSet<>();
           for (Map<String, Object> telemetryConfiguration : telemetry) {
-            if (!"default".equals(telemetryConfiguration.get("when"))) {
-              continue;
-            }
+            String configuration = telemetryConfiguration.get("when").toString();
+            boolean isDefault = "default".equals(configuration);
             List<Map<String, Object>> metrics =
                 (List<Map<String, Object>>) telemetryConfiguration.get("metrics");
+
+            if (isDefault) {
+              defaultSeen = true;
+            } else if (!defaultSeen && metrics != null && !metrics.isEmpty()) {
+              // skip when default configuration was not present
+              // currently we skip spring-webflux-5.0 there the metrics are actually only for the
+              // library instrumentation and not the agent
+              continue;
+            } else if (!configuration.contains("=")) {
+              // only include configurations that look like setting names, this excludes Java17
+              // configuration for runtime-telemetry
+              continue;
+            }
+
             if (metrics != null) {
               for (Map<String, Object> metric : metrics) {
                 String metricName = metric.get("name").toString();
+                String metricDescription = metric.get("description").toString();
+                if (isDefault) {
+                  seenMetrics.add(metricName);
+                } else if (seenMetrics.contains(metricName)) {
+                  // skip over metrics that we have already added
+                  continue;
+                } else {
+                  seenMetrics.add(metricName);
+                  // metric is not present in default configuration
+                  if (!metricDescription.isEmpty() && !metricDescription.endsWith("\n")) {
+                    metricDescription += "\n";
+                  }
+                  metricDescription +=
+                      "This metric is disabled by default and can be enabled with `"
+                          + configuration
+                          + "`.";
+                }
+
                 builder.metric(
                     metricName,
                     toMetricInstrument(metric.get("instrument").toString()),
-                    metric.get("description").toString(),
+                    metricDescription,
                     bundledMetrics.contains(metricName) ? BUNDLED_METRIC : CUSTOM_METRIC);
               }
             }
